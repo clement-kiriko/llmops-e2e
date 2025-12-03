@@ -15,19 +15,30 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      - name: Free up disk space
+        run: |
+          docker system prune -af
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf "/usr/local/share/boost"
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          df -h
+      
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       
       - name: Build Docker image
         run: |
-          docker build -t fastapi-app .
+          docker build -t fastapi-app . 
       
-      - name: Run Trivy vulnerability scanner
+      - name: Run Trivy vulnerability scanner (SARIF)
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'fastapi-app'
           format: 'sarif'
           output: 'trivy-results.sarif'
+          scanners: 'vuln'
+          skip-dirs: '/tmp,/var'
       
       - name: Upload Trivy results to GitHub Security tab
         uses: github/codeql-action/upload-sarif@v3
@@ -42,6 +53,13 @@ jobs:
           format: 'table'
           exit-code: '0'
           severity: 'CRITICAL,HIGH'
+          scanners: 'vuln'
+          skip-dirs: '/tmp,/var'
+      
+      - name: Clean up after scan
+        if: always()
+        run: |
+          docker system prune -f
       
       - name: Run the FastAPI app
         run: |
